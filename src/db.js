@@ -1,5 +1,6 @@
 const mongoose = require('mongoose');
 const UserSchema = require('../schemas/UserSchema');
+const CardSchema = require('../schemas/CardSchema');
 
 const accountModel = mongoose.model('BankAccount', UserSchema);
 
@@ -69,26 +70,38 @@ let openNewAccount = async (client) => {
 }
 
 let closeAccount = async (cardNumber) => {
-    // this is a pretty dangerous function to have tbh but im just including it in the backend
-    // let's just make a restriction on it that requires the funds to be at a complete 0.
-    if (await accountModel.find({ cardNumber: cardNumber }, 'balance') == 0)
+    // removes a card from an account
+
+    let res = await accountModel.findOne({cardNumber: cardNumber});
+    // query for the account that owns the card specified by cardNumber
+    // just saying -- this won't really work with my dual-owned cards idea haha... maybe i can fix this query later
+
+    for (let i = 0; i < res.cards.length; i++)
     {
-        await accountModel.deleteOne({ cardNumber: cardNumber });
-        console.log(`deleted ${cardNumber} successfully`);
+        if (res.cards[i].cardNumber === cardNumber && res.cards[i].balance === 0)
+        {
+            // found the card we need to delete, and its balance is at 0
+            res.cards.splice(i, 1);
+            // splice out the card we need to delete, save it in database
+            await accountModel.updateOne({ cardNumber: cardNumber }, { cards: res.cards });
+        }
     }
-       
+
+    // this might not be useful... just to tell the page we were successful in deleting it i guess
+    return true
+
 }
 
 
-// closeAccount(8376562680277853);
 // development data
 let myClient = {
-    fname: 'Acd',
-    lname: 'Dood',
+    fname: 'Transaction',
+    lname: 'Test',
     address: '172 Neil Court',
     pnumber: '104650725'
 }
 
-openNewAccount(myClient);
+// openNewAccount(myClient);
+// closeAccount('5237880601718106');
 
 module.exports = { openNewAccount };
