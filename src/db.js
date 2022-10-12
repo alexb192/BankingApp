@@ -56,7 +56,7 @@ let openNewAccount = async (client) => {
         {
             // open a new account
             const newAccount = new accountModel({fname, lname, address, pnumber, cards: [new Card(fname, lname, cardNumber)]})
-            await newAccount.save().then(doc => console.log(`${doc} has been saved`));
+            await newAccount.save();
         } else {
             // create new card under that account (update)
             let queryResult = await accountModel.findOne({fname: fname, lname: lname});
@@ -81,7 +81,7 @@ let closeAccount = async (cardNumber) => {
                 // found the card we need to delete, and its balance is at 0
                 res.cards.splice(i, 1);
                 // splice out the card we need to delete, save it in database
-                await accountModel.updateOne({ cardNumber: cardNumber }, { cards: res.cards });
+                await accountModel.updateOne({ "cards.cardNumber": cardNumber }, { cards: res.cards });
             }
         }
     } catch (e) { console.log(e) }
@@ -98,14 +98,14 @@ let closeAccount = async (cardNumber) => {
 
 let withdraw = async (cardNumber, amount) => {
     try {
-        let res = await accountModel.findOne({cardNumber: cardNumber});
+        let res = await accountModel.findOne({"cards.cardNumber": cardNumber});
         for (let i = 0; i < res.cards.length; i++)
         {
             if (res.cards[i].cardNumber === cardNumber && res.cards[i].balance > amount)
             {
                 // only allow to withdraw if they have more than the amount being withdrawed
                 res.cards[i].balance -= amount;
-                await accountModel.updateOne({ cardNumber: cardNumber }, { cards: res.cards });
+                await accountModel.updateOne({ "cards.cardNumber": cardNumber }, { cards: res.cards });
                 // return the new balance
                 return res.cards[i].balance;
             }
@@ -115,13 +115,13 @@ let withdraw = async (cardNumber, amount) => {
 
 let deposit = async (cardNumber, amount) => {
     try {
-        let res = await accountModel.findOne({cardNumber: cardNumber});
+        let res = await accountModel.findOne({"cards.cardNumber": cardNumber});
         for (let i = 0; i < res.cards.length; i++)
         {
             if (res.cards[i].cardNumber === cardNumber)
             {
                 res.cards[i].balance += amount;
-                await accountModel.updateOne({ cardNumber: cardNumber }, { cards: res.cards });
+                await accountModel.updateOne({ "cards.cardNumber": cardNumber }, { cards: res.cards });
                 // return the new balance
                 return res.cards[i].balance;
             }
@@ -129,18 +129,47 @@ let deposit = async (cardNumber, amount) => {
     } catch(e) { console.log(e) }
 }
 
+let transfer = async (sender, receiver, amount) => {
+
+    try {
+
+        let res = await accountModel.findOne({"cards.cardNumber": sender});
+        for (let i = 0; i < res.cards.length; i++)
+        {
+            if (res.cards[i].cardNumber === sender)
+            {
+                res.cards[i].balance -= amount;
+                await accountModel.updateOne({"cards.cardNumber": sender}, {cards: res.cards});
+            }
+        }
+
+        res = await accountModel.findOne({"cards.cardNumber": receiver});
+        for (let i = 0; i < res.cards.length; i++)
+        {
+            if (res.cards[i].cardNumber === receiver)
+            {
+                res.cards[i].balance += amount;
+                await accountModel.updateOne({"cards.cardNumber": receiver}, {cards: res.cards});
+            }
+        }
+        
+    } catch (e) { console.log(e) }
+}
+
 
 // development data
 let myClient = {
-    fname: 'Transaction',
-    lname: 'Test',
+    fname: 'Transfer',
+    lname: 'Tester',
     address: '172 Neil Court',
     pnumber: '104650725'
 }
 
 // openNewAccount(myClient);
 // closeAccount('7524347521163179');
-// deposit('5237880601718106', 500);
+// deposit('7213792123047118', 500);
 // withdraw('5237880601718106', 123);
+// transfer('5237880601718106', '7213792123047118', 500)
+
 
 module.exports = { openNewAccount };
