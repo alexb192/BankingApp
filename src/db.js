@@ -96,6 +96,39 @@ let closeAccount = async (cardNumber) => {
 
 }
 
+let withdraw = async (cardNumber, amount) => {
+    try {
+        let res = await accountModel.findOne({cardNumber: cardNumber});
+        for (let i = 0; i < res.cards.length; i++)
+        {
+            if (res.cards[i].cardNumber === cardNumber && res.cards[i].balance > amount)
+            {
+                // only allow to withdraw if they have more than the amount being withdrawed
+                res.cards[i].balance -= amount;
+                await accountModel.updateOne({ cardNumber: cardNumber }, { cards: res.cards });
+                // return the new balance
+                return res.cards[i].balance;
+            }
+        }
+    } catch(e) { console.log(e) }
+}
+
+let deposit = async (cardNumber, amount) => {
+    try {
+        let res = await accountModel.findOne({cardNumber: cardNumber});
+        for (let i = 0; i < res.cards.length; i++)
+        {
+            if (res.cards[i].cardNumber === cardNumber)
+            {
+                res.cards[i].balance += amount;
+                await accountModel.updateOne({ cardNumber: cardNumber }, { cards: res.cards });
+                // return the new balance
+                return res.cards[i].balance;
+            }
+        }
+    } catch(e) { console.log(e) }
+}
+
 
 // development data
 let myClient = {
@@ -106,6 +139,8 @@ let myClient = {
 }
 
 // openNewAccount(myClient);
-closeAccount('7524347521163179');
+// closeAccount('7524347521163179');
+// deposit('5237880601718106', 500);
+// withdraw('5237880601718106', 123);
 
 module.exports = { openNewAccount };
