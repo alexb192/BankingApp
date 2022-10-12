@@ -1,13 +1,14 @@
 const mongoose = require('mongoose');
 const UserSchema = require('../schemas/UserSchema');
-const CardSchema = require('../schemas/CardSchema');
 
+
+// build our model to be able to access the database
 const accountModel = mongoose.model('BankAccount', UserSchema);
+
 
 async function main() { 
     await mongoose.connect('mongodb://localhost:27017/BirtwistleBank')
 };
-
 main().catch(err => console.log(err))
 // connect to our database
 
@@ -49,43 +50,46 @@ let openNewAccount = async (client) => {
     // modeling the type of tuple we want inserted in the db
     let {fname, lname, address, pnumber} = client;
 
-    console.log((await accountModel.find({fname: fname, lname: lname})).length);
-    
-    if ((await accountModel.find({fname: fname, lname: lname})).length == 0)
+    try 
     {
-        // open a new account
-        console.log(new Card(fname, lname, cardNumber));
-        const newAccount = new accountModel({fname, lname, address, pnumber, cards: [new Card(fname, lname, cardNumber)]})
-        await newAccount.save().then(doc => console.log(`${doc} has been saved`));
-    } else {
-        // create new card under that account (update)
-        let queryResult = await accountModel.findOne({fname: fname, lname: lname});
-        let tempCards = queryResult.cards;
-        tempCards.push(new Card(fname, lname, cardNumber));
-        console.log(tempCards[tempCards.length - 1].cardHolder)
-        await accountModel.updateOne({fname: fname, lname: lname}, {cards: tempCards});
-        
-    }
+        if ((await accountModel.find({fname: fname, lname: lname})).length == 0)
+        {
+            // open a new account
+            const newAccount = new accountModel({fname, lname, address, pnumber, cards: [new Card(fname, lname, cardNumber)]})
+            await newAccount.save().then(doc => console.log(`${doc} has been saved`));
+        } else {
+            // create new card under that account (update)
+            let queryResult = await accountModel.findOne({fname: fname, lname: lname});
+            let tempCards = queryResult.cards;
+            tempCards.push(new Card(fname, lname, cardNumber));
+            await accountModel.updateOne({fname: fname, lname: lname}, {cards: tempCards});
+        }
+    } catch (e) { console.log(e) }
+
 
 }
 
 let closeAccount = async (cardNumber) => {
     // removes a card from an account
 
-    let res = await accountModel.findOne({cardNumber: cardNumber});
+    try {
+        let res = await accountModel.findOne({cardNumber: cardNumber});
+        for (let i = 0; i < res.cards.length; i++)
+        {
+            if (res.cards[i].cardNumber === cardNumber && res.cards[i].balance === 0)
+            {
+                // found the card we need to delete, and its balance is at 0
+                res.cards.splice(i, 1);
+                // splice out the card we need to delete, save it in database
+                await accountModel.updateOne({ cardNumber: cardNumber }, { cards: res.cards });
+            }
+        }
+    } catch (e) { console.log(e) }
+    
     // query for the account that owns the card specified by cardNumber
     // just saying -- this won't really work with my dual-owned cards idea haha... maybe i can fix this query later
-
-    for (let i = 0; i < res.cards.length; i++)
-    {
-        if (res.cards[i].cardNumber === cardNumber && res.cards[i].balance === 0)
-        {
-            // found the card we need to delete, and its balance is at 0
-            res.cards.splice(i, 1);
-            // splice out the card we need to delete, save it in database
-            await accountModel.updateOne({ cardNumber: cardNumber }, { cards: res.cards });
-        }
-    }
+    // maybe i can verify that card.cardHolder.fname === user.fname && card.cardHolder.lname === user.lname
+    // i'll implement it later.
 
     // this might not be useful... just to tell the page we were successful in deleting it i guess
     return true
@@ -102,6 +106,6 @@ let myClient = {
 }
 
 // openNewAccount(myClient);
-// closeAccount('5237880601718106');
+closeAccount('7524347521163179');
 
 module.exports = { openNewAccount };
