@@ -42,6 +42,13 @@ class Card {
     }
 }
 
+let getUser = async(id) => {
+    let res = await accountModel.find({_id: id});
+    res.forEach(user => {
+        console.log(user);
+    })
+    return res;
+}
 
 let openNewAccount = async (client) => {
     let cardNumber = Math.floor(Math.random() * 10000000000000000)
@@ -55,7 +62,8 @@ let openNewAccount = async (client) => {
         if ((await accountModel.find({fname: fname, lname: lname})).length == 0)
         {
             // open a new account
-            const newAccount = new accountModel({fname, lname, address, pnumber, cards: [new Card(fname, lname, cardNumber)]})
+            const userID = Math.floor(Math.random() * 100000000);
+            const newAccount = new accountModel({_id: userID, fname, lname, address, pnumber, cards: [new Card(fname, lname, cardNumber)]})
             await newAccount.save();
         } else {
             // create new card under that account (update)
@@ -158,18 +166,18 @@ let transfer = async (sender, receiver, amount) => {
 
 
 // development data
-let myClient = {
-    fname: 'Transfer',
-    lname: 'Tester',
-    address: '172 Neil Court',
-    pnumber: '104650725'
-}
+// let myClient = {
+//     fname: 'Testy',
+//     lname: 'Tester',
+//     address: '172 Neil Court',
+//     pnumber: '104650725'
+// }
 
 // openNewAccount(myClient);
 // closeAccount('7524347521163179');
 // deposit('7213792123047118', 500);
 // withdraw('5237880601718106', 123);
 // transfer('5237880601718106', '7213792123047118', 500)
+// getUser('32425933');
 
-
-module.exports = { openNewAccount };
+module.exports = { openNewAccount, closeAccount, deposit, withdraw, transfer };
