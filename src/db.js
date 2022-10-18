@@ -42,6 +42,16 @@ class Card {
     }
 }
 
+class Transaction {
+    constructor(sender, receiver, amount)
+    {
+        this.sender = { fname: sender.fname, lname: sender.lname };
+        this.receiver = { fname: receiver.fname, lname: receiver.lname };
+        this.amount = amount;
+        this.date = new Date();
+    }
+}
+
 let getUser = async(id) => {
     let res = await accountModel.find({_id: id});
     res.forEach(user => {
@@ -51,27 +61,30 @@ let getUser = async(id) => {
 }
 
 let openNewAccount = async (client) => {
-    let cardNumber = Math.floor(Math.random() * 10000000000000000)
-    // let cardNumber = 1234123412341234;
 
-    // modeling the type of tuple we want inserted in the db
-    let {fname, lname, address, pnumber} = client;
+    let {username, password, fname, lname, address, pnumber} = client;
 
     try 
     {
-        if ((await accountModel.find({fname: fname, lname: lname})).length == 0)
+        if ((await accountModel.find({"username": username})).length == 0)
         {
-            // open a new account
-            const userID = Math.floor(Math.random() * 100000000);
-            const newAccount = new accountModel({_id: userID, fname, lname, address, pnumber, cards: [new Card(fname, lname, cardNumber)]})
+            // if that user doesn't already exist then open a new account
+            const newAccount = new accountModel({username, password, fname, lname, address, pnumber, cards: []})
             await newAccount.save();
-        } else {
-            // create new card under that account (update)
-            let queryResult = await accountModel.findOne({fname: fname, lname: lname});
-            let tempCards = queryResult.cards;
-            tempCards.push(new Card(fname, lname, cardNumber));
-            await accountModel.updateOne({fname: fname, lname: lname}, {cards: tempCards});
         }
+    } catch (e) { console.log(e) }
+
+}
+
+let openNewCard = async (username) => {
+    
+    try {
+        let cardNumber = Math.floor(Math.random() * 10000000000000000)
+        // create new card under that account (update)
+        let queryResult = await accountModel.findOne({username: username});
+        let tempCards = queryResult.cards;
+        tempCards.push(new Card(queryResult.fname, queryResult.lname, cardNumber));
+        await accountModel.updateOne({username: username}, {cards: tempCards});
     } catch (e) { console.log(e) }
 
 
@@ -106,6 +119,12 @@ let closeAccount = async (cardNumber) => {
 
 let withdraw = async (cardNumber, amount) => {
     try {
+        if (amount < 0)
+        {
+            // this function just doesn't make sense if amount is negative
+            return;
+        }
+
         let res = await accountModel.findOne({"cards.cardNumber": cardNumber});
         for (let i = 0; i < res.cards.length; i++)
         {
@@ -113,6 +132,7 @@ let withdraw = async (cardNumber, amount) => {
             {
                 // only allow to withdraw if they have more than the amount being withdrawed
                 res.cards[i].balance -= amount;
+                res.cards[i].transactions.push(new Transaction(res.cards[i].cardHolder, res.cards[i].cardHolder, 0 - amount))
                 await accountModel.updateOne({ "cards.cardNumber": cardNumber }, { cards: res.cards });
                 // return the new balance
                 return res.cards[i].balance;
@@ -123,12 +143,19 @@ let withdraw = async (cardNumber, amount) => {
 
 let deposit = async (cardNumber, amount) => {
     try {
+        if (amount < 0)
+        {
+            // this function just doesnt make any sense if the amount is negative
+            return
+        }
+
         let res = await accountModel.findOne({"cards.cardNumber": cardNumber});
         for (let i = 0; i < res.cards.length; i++)
         {
             if (res.cards[i].cardNumber === cardNumber)
             {
                 res.cards[i].balance += amount;
+                res.cards[i].transactions.push(new Transaction(res.cards[i].cardHolder, res.cards[i].cardHolder, amount));
                 await accountModel.updateOne({ "cards.cardNumber": cardNumber }, { cards: res.cards });
                 // return the new balance
                 return res.cards[i].balance;
@@ -137,47 +164,74 @@ let deposit = async (cardNumber, amount) => {
     } catch(e) { console.log(e) }
 }
 
-let transfer = async (sender, receiver, amount) => {
+let transfer = async (senderCardNumber, receiverCardNumber, amount) => {
 
     try {
 
-        let res = await accountModel.findOne({"cards.cardNumber": sender});
-        for (let i = 0; i < res.cards.length; i++)
+        if (amount < 0)
         {
-            if (res.cards[i].cardNumber === sender)
+            // we can't take someones money with this function, only give... haha
+            return;
+        }
+
+        let sender = await accountModel.findOne({"cards.cardNumber": senderCardNumber});
+        let receiver = await accountModel.findOne({"cards.cardNumber": receiverCardNumber});
+
+
+        for (let i = 0; i < sender.cards.length; i++)
+        {
+
+            if (sender.cards[i].cardNumber === senderCardNumber)
             {
-                res.cards[i].balance -= amount;
-                await accountModel.updateOne({"cards.cardNumber": sender}, {cards: res.cards});
+                // we need to make sure that the sender actually has enough money to make this transaction
+                if (sender.cards[i].balance < amount) return;
+                // this line of code is very important !!!! 
+
+                sender.cards[i].balance -= amount;
+                sender.cards[i].transactions.push(new Transaction({fname: sender.fname, lname: sender.lname}, {fname: receiver.fname, lname: receiver.lname}, 0 - amount));
+                await accountModel.updateOne({"cards.cardNumber": senderCardNumber}, {cards: sender.cards});
             }
         }
 
-        res = await accountModel.findOne({"cards.cardNumber": receiver});
-        for (let i = 0; i < res.cards.length; i++)
+        for (let i = 0; i < receiver.cards.length; i++)
         {
-            if (res.cards[i].cardNumber === receiver)
+            if (receiver.cards[i].cardNumber === receiverCardNumber)
             {
-                res.cards[i].balance += amount;
-                await accountModel.updateOne({"cards.cardNumber": receiver}, {cards: res.cards});
+                receiver.cards[i].balance += amount;
+                receiver.cards[i].transactions.push(new Transaction({fname: sender.fname, lname: sender.lname}, {fname: receiver.fname, lname: receiver.lname}, amount));
+                await accountModel.updateOne({"cards.cardNumber": receiverCardNumber}, {cards: receiver.cards});
             }
         }
         
     } catch (e) { console.log(e) }
 }
 
+const getTransactions = async (cardNumber) => {
+    let res = await accountModel.findOne({"cards.cardNumber": cardNumber});
+
+    for (let i = 0; i < res.cards.length; i++)
+    {
+        if (res.cards[i].cardNumber === cardNumber);
+        {
+            return res.cards[i].transactions;
+        }
+    }
+}
+
 
 // development data
 // let myClient = {
-//     fname: 'Testy',
-//     lname: 'Tester',
+//     fname: 'King',
+//     lname: 'Testgod',
 //     address: '172 Neil Court',
 //     pnumber: '104650725'
 // }
 
 // openNewAccount(myClient);
 // closeAccount('7524347521163179');
-// deposit('7213792123047118', 500);
+// deposit('1928118405280019', 50000);
 // withdraw('5237880601718106', 123);
-// transfer('5237880601718106', '7213792123047118', 500)
+// transfer('1928118405280019', '5393236545602653', 5000)
 // getUser('32425933');
 
-module.exports = { openNewAccount, closeAccount, deposit, withdraw, transfer };
+module.exports = { openNewAccount, openNewCard, closeAccount, deposit, withdraw, transfer, getTransactions };
