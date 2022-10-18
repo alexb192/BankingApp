@@ -218,6 +218,13 @@ const getTransactions = async (cardNumber) => {
     }
 }
 
+const Login = async (username, password) => {
+    let res = await accountModel.findOne({username: username});
+    if (res.password === password)
+    {
+        return true;
+    } else return false;
+}
 
 // development data
 // let myClient = {
@@ -234,4 +241,4 @@ const getTransactions = async (cardNumber) => {
 // transfer('1928118405280019', '5393236545602653', 5000)
 // getUser('32425933');
 
-module.exports = { openNewAccount, openNewCard, closeAccount, deposit, withdraw, transfer, getTransactions };
+module.exports = { Login, openNewAccount, openNewCard, closeAccount, deposit, withdraw, transfer, getTransactions };
