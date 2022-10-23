@@ -209,6 +209,8 @@ let transfer = async (senderCardNumber, receiverCardNumber, amount) => {
 const getTransactions = async (cardNumber) => {
     let res = await accountModel.findOne({"cards.cardNumber": cardNumber});
 
+    if (res.cards.length < 1) return;
+
     for (let i = 0; i < res.cards.length; i++)
     {
         if (res.cards[i].cardNumber === cardNumber);
