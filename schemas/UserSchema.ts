@@ -1,12 +1,13 @@
-const mongoose = require('mongoose');
+import mongoose from "mongoose"
 const cardSchema = require('./CardSchema');
 
 const UserSchema = new mongoose.Schema({
-    _id: String,
+    username: String,
+    password: String,
     fname: String,
     lname: String,
     address: String,
-    pnumber: Number,
+    pnumber: String,
     cards: [
         cardSchema
     ]

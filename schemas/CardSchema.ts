@@ -1,4 +1,4 @@
-const mongoose = require('mongoose');
+import mongoose from "mongoose";
 const cardHolderSchema = require('./CardHolderSchema');
 const TransactionSchema = require('./TransactionSchema');
 
@@ -9,6 +9,6 @@ const cardSchema = new mongoose.Schema({
     transactions: [
         TransactionSchema
     ]
-})
+}, {_id: false});
 
 module.exports = cardSchema;

@@ -1,6 +1,5 @@
-const mongoose = require('mongoose');
+import mongoose from 'mongoose';
 const UserSchema = require('../schemas/UserSchema');
-
 
 // build our model to be able to access the database
 const accountModel = mongoose.model('BankAccount', UserSchema);
@@ -12,19 +11,10 @@ async function main() {
 main().catch(err => console.log(err))
 // connect to our database
 
-
-// so, what are we looking at for our banking API?
-// business requirements:
-// open a bank account
-// close a bank account
-// withdraw funds
-// deposit funds
-// transfer funds
-// create a log in functionality later
-// => api should only be accessible with a unique identifier to denote the account being used
-
 // generic class for attributing holder information to a card
 class CardHolder {
+    fname: string;
+    lname: string;
     constructor(fname, lname)
     {
         this.fname = fname;
@@ -34,6 +24,10 @@ class CardHolder {
 
 // generic class for constructing new bank accounts to be stored in the database.
 class Card {
+    cardHolder: CardHolder;
+    cardNumber: string;
+    balance: number;
+
     constructor(fname, lname, cardNumber)
     {
         this.cardHolder = new CardHolder(fname, lname);
@@ -43,6 +37,10 @@ class Card {
 }
 
 class Transaction {
+    sender: CardHolder;
+    receiver: CardHolder;
+    amount: number;
+    date: Date;
     constructor(sender, receiver, amount)
     {
         this.sender = { fname: sender.fname, lname: sender.lname };
@@ -81,7 +79,7 @@ let openNewCard = async (username) => {
     try {
         let cardNumber = Math.floor(Math.random() * 10000000000000000)
         // create new card under that account (update)
-        let queryResult = await accountModel.findOne({username: username});
+        let queryResult = await accountModel.findOne({username: username}) as any;
         let tempCards = queryResult.cards;
         tempCards.push(new Card(queryResult.fname, queryResult.lname, cardNumber));
         await accountModel.updateOne({username: username}, {cards: tempCards});
@@ -94,7 +92,7 @@ let closeAccount = async (cardNumber) => {
     // removes a card from an account
 
     try {
-        let res = await accountModel.findOne({cardNumber: cardNumber});
+        let res = await accountModel.findOne({cardNumber: cardNumber}) as any;
         for (let i = 0; i < res.cards.length; i++)
         {
             if (res.cards[i].cardNumber === cardNumber && res.cards[i].balance === 0)
@@ -125,7 +123,7 @@ let withdraw = async (cardNumber, amount) => {
             return;
         }
 
-        let res = await accountModel.findOne({"cards.cardNumber": cardNumber});
+        let res = await accountModel.findOne({"cards.cardNumber": cardNumber}) as any;
         for (let i = 0; i < res.cards.length; i++)
         {
             if (res.cards[i].cardNumber === cardNumber && res.cards[i].balance > amount)
@@ -149,7 +147,7 @@ let deposit = async (cardNumber, amount) => {
             return
         }
 
-        let res = await accountModel.findOne({"cards.cardNumber": cardNumber});
+        let res = await accountModel.findOne({"cards.cardNumber": cardNumber}) as any;
         for (let i = 0; i < res.cards.length; i++)
         {
             if (res.cards[i].cardNumber === cardNumber)
@@ -174,8 +172,8 @@ let transfer = async (senderCardNumber, receiverCardNumber, amount) => {
             return;
         }
 
-        let sender = await accountModel.findOne({"cards.cardNumber": senderCardNumber});
-        let receiver = await accountModel.findOne({"cards.cardNumber": receiverCardNumber});
+        let sender = await accountModel.findOne({"cards.cardNumber": senderCardNumber}) as any;
+        let receiver = await accountModel.findOne({"cards.cardNumber": receiverCardNumber}) as any;
 
 
         for (let i = 0; i < sender.cards.length; i++)
@@ -207,13 +205,13 @@ let transfer = async (senderCardNumber, receiverCardNumber, amount) => {
 }
 
 const getTransactions = async (cardNumber) => {
-    let res = await accountModel.findOne({"cards.cardNumber": cardNumber});
+    let res = await accountModel.findOne({"cards.cardNumber": cardNumber}) as any;
 
     if (res.cards.length < 1) return;
 
     for (let i = 0; i < res.cards.length; i++)
     {
-        if (res.cards[i].cardNumber === cardNumber);
+        if (res.cards[i].cardNumber === cardNumber)
         {
             return res.cards[i].transactions;
         }
@@ -221,26 +219,20 @@ const getTransactions = async (cardNumber) => {
 }
 
 const Login = async (username, password) => {
-    let res = await accountModel.findOne({username: username});
+    let res = await accountModel.findOne({username: username}) as any;
     if (res.password === password)
     {
         return true;
     } else return false;
 }
 
-// development data
-// let myClient = {
-//     fname: 'King',
-//     lname: 'Testgod',
-//     address: '172 Neil Court',
-//     pnumber: '104650725'
-// }
+const getCards = async (username) => {
+    let res = await accountModel.findOne({username: username}) as any;
+    if (res.username)
+    {
+        return res.cards;
+    }
+    return null;
+}
 
-// openNewAccount(myClient);
-// closeAccount('7524347521163179');
-// deposit('1928118405280019', 50000);
-// withdraw('5237880601718106', 123);
-// transfer('1928118405280019', '5393236545602653', 5000)
-// getUser('32425933');
-
-module.exports = { Login, openNewAccount, openNewCard, closeAccount, deposit, withdraw, transfer, getTransactions };
+module.exports = { getCards, Login, openNewAccount, openNewCard, closeAccount, deposit, withdraw, transfer, getTransactions };
